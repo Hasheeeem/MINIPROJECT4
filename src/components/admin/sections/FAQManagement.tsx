@@ -1,60 +1,60 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, X, Edit2, Trash2, MessageSquare } from 'lucide-react';
+import axios from 'axios';
 
 interface FAQ {
-  id: string;
+  _id?: string;
   question: string;
   answer: string;
   category: string;
 }
 
 const FAQManagement = () => {
-  const [faqs, setFaqs] = useState<FAQ[]>([
-    {
-      id: '1',
-      question: "What types of events do you manage?",
-      answer: "We specialize in a wide range of events including corporate gatherings, weddings, conferences, product launches, fashion shows, and private celebrations. Our team has extensive experience in handling both intimate gatherings and large-scale events with thousands of attendees.",
-      category: "Services"
-    },
-    {
-      id: '2',
-      question: "How far in advance should I book your services?",
-      answer: "For large events like weddings and corporate conferences, we recommend booking at least 6-8 months in advance. For smaller events, 3-4 months notice is typically sufficient. However, we also accommodate last-minute requests based on availability.",
-      category: "Booking"
-    },
-  ]);
-
+  const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [isAddingFAQ, setIsAddingFAQ] = useState(false);
   const [editingFAQ, setEditingFAQ] = useState<FAQ | null>(null);
-  const [newFAQ, setNewFAQ] = useState<Partial<FAQ>>({
+  const [newFAQ, setNewFAQ] = useState<FAQ>({
     question: '',
     answer: '',
     category: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingFAQ) {
-      setFaqs(faqs.map(faq =>
-        faq.id === editingFAQ.id ? { ...faq, ...newFAQ } : faq
-      ));
-      setEditingFAQ(null);
-    } else {
-      setFaqs([
-        ...faqs,
-        {
-          ...newFAQ as FAQ,
-          id: Date.now().toString(),
-        },
-      ]);
+  // Fetch FAQs from backend
+  const fetchFAQs = async () => {
+    try {
+      const response = await axios.get('http://127.0.0.1:8000/faqs');
+      setFaqs(response.data);
+    } catch (error) {
+      console.error('Error fetching FAQs:', error);
     }
-    setIsAddingFAQ(false);
-    setNewFAQ({
-      question: '',
-      answer: '',
-      category: '',
-    });
+  };
+
+  useEffect(() => {
+    fetchFAQs();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('adminToken');
+      const headers = { Authorization: `Bearer ${token}` };
+
+      if (editingFAQ?._id) {
+        // Update existing FAQ
+        await axios.put(`http://127.0.0.1:8000/faqs/${editingFAQ._id}`, newFAQ, { headers });
+      } else {
+        // Create new FAQ
+        await axios.post('http://127.0.0.1:8000/faqs', newFAQ, { headers });
+      }
+
+      setIsAddingFAQ(false);
+      setEditingFAQ(null);
+      setNewFAQ({ question: '', answer: '', category: '' });
+      fetchFAQs(); // Refresh the FAQ list
+    } catch (error) {
+      console.error('Error saving FAQ:', error);
+    }
   };
 
   const handleEdit = (faq: FAQ) => {
@@ -63,9 +63,17 @@ const FAQManagement = () => {
     setIsAddingFAQ(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this FAQ?')) {
-      setFaqs(faqs.filter(faq => faq.id !== id));
+      try {
+        const token = localStorage.getItem('adminToken');
+        await axios.delete(`http://127.0.0.1:8000/faqs/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        fetchFAQs(); // Refresh the FAQ list
+      } catch (error) {
+        console.error('Error deleting FAQ:', error);
+      }
     }
   };
 
@@ -95,7 +103,7 @@ const FAQManagement = () => {
         <div className="space-y-4">
           {faqs.map((faq) => (
             <motion.div
-              key={faq.id}
+              key={faq._id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className="bg-neutral-900 rounded-xl p-6"
@@ -125,7 +133,7 @@ const FAQManagement = () => {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => handleDelete(faq.id)}
+                    onClick={() => faq._id && handleDelete(faq._id)}
                     className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
                   >
                     <Trash2 className="w-5 h-5" />
