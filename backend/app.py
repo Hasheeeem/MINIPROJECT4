@@ -30,6 +30,7 @@ client = AsyncIOMotorClient(MONGO_URI)
 db = client[DB_NAME]
 contacts_collection = db["contacts"]
 admins_collection = db["admins"]
+faqs_collection = db["faqs"]  # New collection for FAQs
 
 # JWT Security
 SECRET_KEY = os.getenv("SECRET_KEY", "miniproject")
@@ -59,6 +60,11 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+class FAQ(BaseModel):
+    question: str
+    answer: str
+    category: str
+
 # Password Hashing
 def hash_password(password: str) -> str:
     salt = bcrypt.gensalt()
@@ -85,6 +91,52 @@ async def get_current_admin(token: str = Depends(oauth2_scheme)):
         return {"email": email}
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+# FAQ Management Endpoints
+@app.get("/faqs")
+async def get_faqs():
+    try:
+        faqs = await faqs_collection.find().to_list(length=None)
+        return [{**faq, "_id": str(faq["_id"])} for faq in faqs]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/faqs")
+async def create_faq(faq: FAQ, _: dict = Depends(get_current_admin)):
+    try:
+        result = await faqs_collection.insert_one(faq.dict())
+        if result.inserted_id:
+            return {"message": "FAQ created successfully", "id": str(result.inserted_id)}
+        raise HTTPException(status_code=500, detail="Failed to create FAQ")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/faqs/{faq_id}")
+async def update_faq(faq_id: str, faq: FAQ, _: dict = Depends(get_current_admin)):
+    try:
+        result = await faqs_collection.update_one(
+            {"_id": ObjectId(faq_id)},
+            {"$set": faq.dict()}
+        )
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="FAQ not found")
+        return {"message": "FAQ updated successfully"}
+    except errors.InvalidId:
+        raise HTTPException(status_code=400, detail="Invalid FAQ ID")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/faqs/{faq_id}")
+async def delete_faq(faq_id: str, _: dict = Depends(get_current_admin)):
+    try:
+        result = await faqs_collection.delete_one({"_id": ObjectId(faq_id)})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="FAQ not found")
+        return {"message": "FAQ deleted successfully"}
+    except errors.InvalidId:
+        raise HTTPException(status_code=400, detail="Invalid FAQ ID")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Submit Contact Form
 @app.post("/submit")
