@@ -23,6 +23,78 @@ import AdminDashboard from "./components/admin/AdminDashboard";
 import Preloader from "./components/Preloader";
 import ParticlesBackground from "./components/ParticlesBackground";
 
+// 🔒 IP GUARD COMPONENT - ADD THIS NEW COMPONENT
+const IPGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isAllowed, setIsAllowed] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [userIP, setUserIP] = useState('');
+
+  useEffect(() => {
+    checkIP();
+  }, []);
+
+  const checkIP = async () => {
+    try {
+      const response = await fetch('https://api.ipify.org?format=json');
+      const data = await response.json();
+      const currentIP = data.ip;
+      setUserIP(currentIP);
+      
+      // 🔥 REPLACE WITH YOUR ACTUAL IP ADDRESSES
+      const allowedIPs = [
+        '89.211.127.150',     // Replace with your home IP
+        'YOUR_OFFICE_IP_HERE',   // Replace with your office IP
+        'YOUR_PHONE_IP_HERE'     // Add mobile IP if needed
+      ];
+      
+      console.log('Current IP:', currentIP); // For debugging - remove later
+      setIsAllowed(allowedIPs.includes(currentIP));
+    } catch (error) {
+      console.error('Error checking IP:', error);
+      setIsAllowed(false);
+    }
+    setLoading(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-white">Verifying access permissions...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!isAllowed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-900 to-black">
+        <div className="text-center max-w-md p-8">
+          <div className="text-red-500 text-8xl mb-6">🚫</div>
+          <h1 className="text-3xl font-bold text-red-400 mb-4">Access Denied</h1>
+          <p className="text-red-300 mb-4">
+            Your IP address <span className="font-mono bg-red-900 px-2 py-1 rounded text-white">{userIP}</span> is not authorized to access this admin section.
+          </p>
+          <p className="text-sm text-gray-400 mb-6">
+            Contact the administrator if you believe this is an error.
+          </p>
+          <div className="mt-6">
+            <button 
+              onClick={() => window.location.href = '/'}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors"
+            >
+              Go to Main Site
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+};
+
 // Admin Security Hook - Only for Tab Switching
 const useAdminSecurity = () => {
   const navigate = useNavigate();
@@ -216,14 +288,20 @@ const AppContent = () => {
       <AnimatePresence>{initialLoading && <Preloader />}</AnimatePresence>
 
       <Routes>
-        {/* Admin Routes */}
-        <Route path="/admin/login" element={<AdminLogin />} />
+        {/* 🔒 ADMIN ROUTES - NOW PROTECTED WITH IP WHITELISTING */}
+        <Route path="/admin/login" element={
+          <IPGuard>
+            <AdminLogin />
+          </IPGuard>
+        } />
         <Route
           path="/admin/*"
           element={
-            <ProtectedRoute>
-              <AdminDashboard />
-            </ProtectedRoute>
+            <IPGuard>
+              <ProtectedRoute>
+                <AdminDashboard />
+              </ProtectedRoute>
+            </IPGuard>
           }
         />
 
@@ -267,6 +345,7 @@ const AppContent = () => {
                   <InteractiveGallery />
                 </div>
               </div>
+            </div>
             </PageTransitionWrapper>
           }
         />
