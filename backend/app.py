@@ -884,6 +884,49 @@ async def submit_form(contact: Contact, request: Request):
         logging.error(f"Unexpected error processing contact form: {e}")
         raise HTTPException(status_code=500, detail="An error occurred while processing your request. Please try again later.")
 
+# IP Validation Endpoint for Admin Access
+@app.post("/api/validate-ip")
+async def validate_ip(request: Request):
+    try:
+        body = await request.json()
+        ip = body.get("ip")
+        
+        if not ip:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "IP address required"}
+            )
+
+        # Get allowed IPs from environment variables
+        allowed_ips = [
+            os.getenv("ALLOWED_IP_1"),
+            os.getenv("ALLOWED_IP_2"), 
+            os.getenv("ALLOWED_IP_3"),
+        ]
+        allowed_ips = [ip_addr for ip_addr in allowed_ips if ip_addr]
+
+        print(f"🔍 IP Validation Request:")
+        print(f"Current IP: {ip}")
+        print(f"Allowed IPs: {allowed_ips}")
+
+        # Check if IP is allowed
+        is_allowed = ip in allowed_ips
+        
+        print(f"✅ Validation Result: {is_allowed}")
+
+        return {
+            "allowed": is_allowed,
+            "ip": ip,
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        print(f"❌ IP validation error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal server error"}
+        )
+
 # ADD this health endpoint if you don't have it
 @app.get("/health")
 async def health_check():

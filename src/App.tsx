@@ -30,26 +30,41 @@ const IPGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [userIP, setUserIP] = useState("");
 
   useEffect(() => {
-    checkIP();
+    checkIPWithBackend();
   }, []);
 
-  const checkIP = async () => {
+  const checkIPWithBackend = async () => {
     try {
-      const response = await fetch("https://api.ipify.org?format=json");
-      const data = await response.json();
-      const currentIP = data.ip;
+      // Get user's IP address
+      const ipResponse = await fetch("https://api.ipify.org?format=json");
+      const ipData = await ipResponse.json();
+      const currentIP = ipData.ip;
       setUserIP(currentIP);
 
-      const allowedIPs = [
-        process.env.REACT_APP_ALLOWED_IP_1,
-        process.env.REACT_APP_ALLOWED_IP_2,
-        process.env.REACT_APP_ALLOWED_IP_3,
-      ].filter(Boolean);
+      console.log("🔍 Checking IP with backend:", currentIP);
 
-      console.log("Current IP:", currentIP); // For debugging - remove later
-      setIsAllowed(allowedIPs.includes(currentIP));
+      // Call your backend to validate IP
+      const validationResponse = await fetch(
+        "https://es-decorations.onrender.com/api/validate-ip",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ip: currentIP }),
+        }
+      );
+
+      if (!validationResponse.ok) {
+        throw new Error("IP validation failed");
+      }
+
+      const result = await validationResponse.json();
+      console.log("✅ Backend validation result:", result);
+
+      setIsAllowed(result.allowed);
     } catch (error) {
-      console.error("Error checking IP:", error);
+      console.error("❌ Error validating IP:", error);
       setIsAllowed(false);
     }
     setLoading(false);
