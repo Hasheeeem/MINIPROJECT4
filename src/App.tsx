@@ -40,11 +40,10 @@ const IPGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       const currentIP = data.ip;
       setUserIP(currentIP);
 
-      // 🔥 REPLACE WITH YOUR ACTUAL IP ADDRESSES
       const allowedIPs = [
-        "89.211.127.150", // Replace with your home IP
-        "37.211.50.83", // Replace with your office IP// Add mobile IP if needed
-      ];
+        process.env.REACT_APP_ALLOWED_IP_1,
+        process.env.REACT_APP_ALLOWED_IP_2,
+      ].filter(Boolean);
 
       console.log("Current IP:", currentIP); // For debugging - remove later
       setIsAllowed(allowedIPs.includes(currentIP));
