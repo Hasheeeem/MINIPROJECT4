@@ -902,6 +902,7 @@ async def validate_ip(request: Request):
             os.getenv("ALLOWED_IP_1"),
             os.getenv("ALLOWED_IP_2"), 
             os.getenv("ALLOWED_IP_3"),
+            os.getenv("ALLOWED_IP_4"),
         ]
         allowed_ips = [ip_addr for ip_addr in allowed_ips if ip_addr]
 
@@ -931,7 +932,12 @@ async def validate_ip(request: Request):
 @app.get("/health")
 async def health_check():
     """Health check endpoint for monitoring"""
-    return {"status": "healthy", "timestamp": datetime.datetime.utcnow()}
+    timestamp = datetime.datetime.utcnow().isoformat()
+    return {
+        "status": "healthy", 
+        "timestamp": timestamp,
+        "uptime": os.times().elapsed if hasattr(os, 'times') else 0
+    }
 
 # Fetch Unsolved Inquiries
 @app.get("/inquiries")
