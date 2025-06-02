@@ -23,10 +23,8 @@ import AdminDashboard from "./components/admin/AdminDashboard";
 import Preloader from "./components/Preloader";
 import ParticlesBackground from "./components/ParticlesBackground";
 
-// 🔒 UPDATED DEBUG IP GUARD COMPONENT
+// 🔒 IP GUARD COMPONENT - ADD THIS NEW COMPONENT
 const IPGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  console.log("🚨 IP GUARD COMPONENT IS RUNNING!"); // This should show up immediately
-
   const [isAllowed, setIsAllowed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userIP, setUserIP] = useState("");
@@ -43,59 +41,15 @@ const IPGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       setUserIP(currentIP);
 
       const allowedIPs = [
-        process.env.REACT_APP_ALLOWED_IP_1,
-        process.env.REACT_APP_ALLOWED_IP_2,
-        process.env.REACT_APP_ALLOWED_IP_3,
+        process.env.ALLOWED_IP_1,
+        process.env.ALLOWED_IP_2,
+        process.env.ALLOWED_IP_3,
       ].filter(Boolean);
 
-      // COMPREHENSIVE DEBUG LOGGING
-      console.log("🔍 COMPREHENSIVE DEBUG INFO:");
-      console.log("Current IP:", currentIP);
-      console.log(
-        "IP1 Environment Variable:",
-        process.env.REACT_APP_ALLOWED_IP_1
-      );
-      console.log(
-        "IP2 Environment Variable:",
-        process.env.REACT_APP_ALLOWED_IP_2
-      );
-      console.log(
-        "IP3 Environment Variable:",
-        process.env.REACT_APP_ALLOWED_IP_3
-      );
-      console.log("Filtered Allowed IPs Array:", allowedIPs);
-      console.log("Environment:", process.env.NODE_ENV);
-      console.log(
-        "All REACT_APP vars:",
-        Object.keys(process.env).filter((key) => key.startsWith("REACT_APP_"))
-      );
-      console.log("Total process.env keys:", Object.keys(process.env).length);
-
-      // Check if IP is allowed
-      const isIPAllowed =
-        allowedIPs.length > 0 && allowedIPs.includes(currentIP);
-      console.log("🎯 IP MATCH RESULT:", isIPAllowed);
-      console.log("🎯 Match Details:", {
-        hasAllowedIPs: allowedIPs.length > 0,
-        currentIPInArray: allowedIPs.includes(currentIP),
-        exactMatches: allowedIPs.map((ip) => ({
-          ip,
-          matches: ip === currentIP,
-        })),
-      });
-
-      // Set access based on IP match
-      if (allowedIPs.length === 0) {
-        console.log(
-          "⚠️ NO ENVIRONMENT VARIABLES FOUND - This means they're not loading"
-        );
-        setIsAllowed(false);
-      } else {
-        console.log("✅ Environment variables found, checking IP match...");
-        setIsAllowed(isIPAllowed);
-      }
+      console.log("Current IP:", currentIP); // For debugging - remove later
+      setIsAllowed(allowedIPs.includes(currentIP));
     } catch (error) {
-      console.error("❌ Error in IP check:", error);
+      console.error("Error checking IP:", error);
       setIsAllowed(false);
     }
     setLoading(false);
@@ -130,30 +84,13 @@ const IPGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <p className="text-sm text-gray-400 mb-6">
             Contact the administrator if you believe this is an error.
           </p>
-          <div className="mt-6 space-y-3">
+          <div className="mt-6">
             <button
               onClick={() => (window.location.href = "/")}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors block w-full"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors"
             >
               Go to Main Site
             </button>
-
-            {/* TEMPORARY DEBUG BUTTON */}
-            <button
-              onClick={() => {
-                console.log(
-                  "🚨 FORCE ALLOWING ACCESS - Check console logs above"
-                );
-                setIsAllowed(true);
-              }}
-              className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-3 rounded-lg transition-colors text-sm block w-full"
-            >
-              🐛 Force Allow (Check Console Logs)
-            </button>
-          </div>
-
-          <div className="mt-4 text-xs text-gray-400">
-            Press F12 → Console tab to see detailed debug information
           </div>
         </div>
       </div>
