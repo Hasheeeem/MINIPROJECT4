@@ -43,6 +43,7 @@ const IPGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       const allowedIPs = [
         process.env.REACT_APP_ALLOWED_IP_1,
         process.env.REACT_APP_ALLOWED_IP_2,
+        process.env.REACT_APP_ALLOWED_IP_3,
       ].filter(Boolean);
 
       console.log("Current IP:", currentIP); // For debugging - remove later

@@ -11,6 +11,9 @@ import {
   Edit2,
   FileText,
   Eye,
+  Download,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import axios from "axios";
 
@@ -50,6 +53,11 @@ const JobManagement = () => {
   const [editingJob, setEditingJob] = useState<JobListing | null>(null);
   const [selectedApplication, setSelectedApplication] =
     useState<JobApplication | null>(null);
+  const [pdfPreview, setPdfPreview] = useState<{
+    application: JobApplication;
+    pdfUrl: string;
+  } | null>(null);
+  const [pdfZoom, setPdfZoom] = useState(1);
   const [newJob, setNewJob] = useState<JobListing>({
     id: "",
     title: "",
@@ -63,6 +71,15 @@ const JobManagement = () => {
   useEffect(() => {
     fetchData();
   }, [activeTab]);
+
+  // Cleanup PDF URLs when component unmounts or PDF preview closes
+  useEffect(() => {
+    return () => {
+      if (pdfPreview?.pdfUrl) {
+        URL.revokeObjectURL(pdfPreview.pdfUrl);
+      }
+    };
+  }, [pdfPreview]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -196,24 +213,57 @@ const JobManagement = () => {
 
   const handleViewResume = (application: JobApplication) => {
     if (application.resume) {
-      // Create a Blob from the base64 data
-      const byteCharacters = atob(application.resume);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      try {
+        // Create a Blob from the base64 data
+        const byteCharacters = atob(application.resume);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: "application/pdf" });
+
+        // Create a URL for the Blob
+        const fileURL = URL.createObjectURL(blob);
+
+        // Set the PDF preview state
+        setPdfPreview({
+          application,
+          pdfUrl: fileURL,
+        });
+        setPdfZoom(1); // Reset zoom when opening new PDF
+      } catch (error) {
+        console.error("Error creating PDF preview:", error);
+        alert("Error loading PDF. The file might be corrupted.");
       }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: "application/pdf" });
-
-      // Create a URL for the Blob
-      const fileURL = URL.createObjectURL(blob);
-
-      // Open in a new tab
-      window.open(fileURL, "_blank");
-
-      // Clean up the URL after a delay
-      setTimeout(() => URL.revokeObjectURL(fileURL), 1000);
     }
+  };
+
+  const closePdfPreview = () => {
+    if (pdfPreview?.pdfUrl) {
+      URL.revokeObjectURL(pdfPreview.pdfUrl);
+    }
+    setPdfPreview(null);
+    setPdfZoom(1);
+  };
+
+  const downloadResume = () => {
+    if (pdfPreview?.pdfUrl && pdfPreview?.application) {
+      const link = document.createElement("a");
+      link.href = pdfPreview.pdfUrl;
+      link.download = `${pdfPreview.application.name}_Resume.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const handleZoomIn = () => {
+    setPdfZoom((prev) => Math.min(prev + 0.25, 3));
+  };
+
+  const handleZoomOut = () => {
+    setPdfZoom((prev) => Math.max(prev - 0.25, 0.5));
   };
 
   if (loading) {
@@ -440,7 +490,7 @@ const JobManagement = () => {
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-neutral-900 rounded-xl p-6 max-w-2xl w-full"
+                className="bg-neutral-900 rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex justify-between items-center mb-6">
@@ -535,10 +585,100 @@ const JobManagement = () => {
                         className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-500 rounded-lg hover:bg-blue-500/20 transition-colors"
                       >
                         <FileText className="h-5 w-5" />
-                        View Resume
+                        Preview Resume
                       </motion.button>
                     </div>
                   )}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* PDF Preview Modal */}
+        <AnimatePresence>
+          {pdfPreview && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+              onClick={closePdfPreview}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-neutral-900 rounded-xl w-full max-w-4xl h-[90vh] flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="flex justify-between items-center p-4 border-b border-neutral-800">
+                  <div>
+                    <h3 className="text-xl font-bold">Resume Preview</h3>
+                    <p className="text-neutral-400 text-sm">
+                      {pdfPreview.application.name}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 bg-neutral-800 rounded-lg p-1">
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleZoomOut}
+                        className="p-1 text-neutral-400 hover:text-white transition-colors"
+                        disabled={pdfZoom <= 0.5}
+                      >
+                        <ZoomOut className="h-4 w-4" />
+                      </motion.button>
+                      <span className="px-2 text-sm text-neutral-300 min-w-[50px] text-center">
+                        {Math.round(pdfZoom * 100)}%
+                      </span>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleZoomIn}
+                        className="p-1 text-neutral-400 hover:text-white transition-colors"
+                        disabled={pdfZoom >= 3}
+                      >
+                        <ZoomIn className="h-4 w-4" />
+                      </motion.button>
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={downloadResume}
+                      className="p-2 bg-green-500/10 text-green-500 rounded-lg hover:bg-green-500/20 transition-colors"
+                      title="Download Resume"
+                    >
+                      <Download className="h-5 w-5" />
+                    </motion.button>
+                    <button
+                      onClick={closePdfPreview}
+                      className="p-2 text-neutral-400 hover:text-white transition-colors"
+                    >
+                      <X className="h-6 w-6" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* PDF Content */}
+                <div className="flex-1 overflow-auto bg-neutral-800 p-4">
+                  <div className="flex justify-center">
+                    <div
+                      style={{
+                        transform: `scale(${pdfZoom})`,
+                        transformOrigin: "top center",
+                      }}
+                    >
+                      <iframe
+                        src={pdfPreview.pdfUrl}
+                        className="w-[600px] h-[800px] bg-white rounded-lg shadow-lg"
+                        title="Resume Preview"
+                        style={{ border: "none" }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             </motion.div>
@@ -564,7 +704,7 @@ const JobManagement = () => {
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-neutral-900 rounded-xl p-6 max-w-2xl w-full"
+                className="bg-neutral-900 rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex justify-between items-center mb-6">
