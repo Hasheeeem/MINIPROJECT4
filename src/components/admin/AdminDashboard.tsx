@@ -66,7 +66,7 @@ const AdminLayout = () => {
 
   const handleLogout = () => {
     localStorage.removeItem("adminToken");
-    navigate("/admin/login");
+    navigate("/admin-management-pambady-kayathumkal/login"); // ✅ NEW URL
   };
 
   const getCurrentPageTitle = () => {
