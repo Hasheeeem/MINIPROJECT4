@@ -38,7 +38,7 @@ const AdminSettings = () => {
 
     try {
       const response = await fetch(
-        `https://es-decorations.onrender.com/admin/update/${adminId}`,
+        `https://es-decorations.onrender.com/admin-management-pambady-kayathumkal/update/${adminId}`, // ✅ FIXED: Updated endpoint
         {
           method: "PATCH",
           headers: {
@@ -69,7 +69,7 @@ const AdminSettings = () => {
 
     try {
       const response = await fetch(
-        "https://es-decorations.onrender.com/admin/add",
+        "https://es-decorations.onrender.com/admin-management-pambady-kayathumkal/add", // ✅ FIXED: Updated endpoint
         {
           method: "POST",
           headers: {
@@ -88,6 +88,7 @@ const AdminSettings = () => {
       }
     } catch (error) {
       console.error("Error adding admin:", error);
+      alert("Network error occurred. Please try again.");
     }
   };
 
