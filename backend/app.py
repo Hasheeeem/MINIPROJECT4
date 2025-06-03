@@ -23,6 +23,9 @@ from PIL import Image
 import httpx
 from collections import defaultdict
 from fastapi import Request
+import random
+import string
+from typing import Dict
 
 # NEW: Import Resend SDK
 import resend
@@ -336,6 +339,17 @@ class LatestWork(BaseModel):
     title: str
     thumbnail: str  # Will store base64 image data
     category: str
+
+class AdminLoginRequest(BaseModel):
+    email: str
+    password: str
+    verification_code: str = ""
+
+class RequestVerificationCode(BaseModel):
+    email: str
+    password: str
+
+verification_codes: Dict[str, Dict] = {}
 
 # Event Management Endpoints
 @app.get("/events")
@@ -884,50 +898,6 @@ async def submit_form(contact: Contact, request: Request):
         logging.error(f"Unexpected error processing contact form: {e}")
         raise HTTPException(status_code=500, detail="An error occurred while processing your request. Please try again later.")
 
-# IP Validation Endpoint for Admin Access
-@app.post("/api/validate-ip")
-async def validate_ip(request: Request):
-    try:
-        body = await request.json()
-        ip = body.get("ip")
-        
-        if not ip:
-            return JSONResponse(
-                status_code=400,
-                content={"error": "IP address required"}
-            )
-
-        # Get allowed IPs from environment variables
-        allowed_ips = [
-            os.getenv("ALLOWED_IP_1"),
-            os.getenv("ALLOWED_IP_2"), 
-            os.getenv("ALLOWED_IP_3"),
-            os.getenv("ALLOWED_IP_4"),
-        ]
-        allowed_ips = [ip_addr for ip_addr in allowed_ips if ip_addr]
-
-        print(f"🔍 IP Validation Request:")
-        print(f"Current IP: {ip}")
-        print(f"Allowed IPs: {allowed_ips}")
-
-        # Check if IP is allowed
-        is_allowed = ip in allowed_ips
-        
-        print(f"✅ Validation Result: {is_allowed}")
-
-        return {
-            "allowed": is_allowed,
-            "ip": ip,
-            "timestamp": datetime.datetime.utcnow().isoformat()
-        }
-
-    except Exception as e:
-        print(f"❌ IP validation error: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Internal server error"}
-        )
-
 # ADD this health endpoint if you don't have it
 @app.get("/health")
 async def health_check():
@@ -1124,22 +1094,211 @@ E&S Decorations Team
         raise HTTPException(status_code=500, detail="Failed to send reply")
 
 # Admin Login with JWT
-@app.post("/admin/login", response_model=Token)
-async def admin_login(form_data: OAuth2PasswordRequestForm = Depends()):
+def generate_verification_code() -> str:
+    """Generate a 6-digit verification code"""
+    return ''.join(random.choices(string.digits, k=6))
+
+async def send_admin_verification_email(email: str, code: str, admin_name: str = "Admin"):
+    """Send verification code via email for admin login"""
     try:
-        admin = await admins_collection.find_one({"email": form_data.username})
+        subject = "🔐 E&S Decorations - Admin Login Verification"
         
-        if not admin or not verify_password(form_data.password, admin["password"]):
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Admin Login Verification</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">🔐 Admin Login Verification</h1>
+                <p style="color: #f0f0f0; margin: 10px 0 0 0;">E&S Decorations Security System</p>
+            </div>
+            
+            <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <p style="font-size: 16px; margin-bottom: 20px;">Hello <strong>{admin_name}</strong>,</p>
+                
+                <p style="margin-bottom: 20px;">
+                    Someone is attempting to access the E&S Decorations admin panel. If this is you, 
+                    please use the verification code below to complete your login:
+                </p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                    <div style="background: #667eea; color: white; padding: 25px; border-radius: 15px; font-size: 36px; font-weight: bold; letter-spacing: 8px; display: inline-block; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);">
+                        {code}
+                    </div>
+                </div>
+                
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 20px; border-radius: 8px; margin: 25px 0;">
+                    <p style="margin: 0; color: #856404; font-weight: bold;">⚠️ Security Notice:</p>
+                    <ul style="margin: 10px 0 0 20px; color: #856404;">
+                        <li>This code expires in <strong>5 minutes</strong></li>
+                        <li>Never share this code with anyone</li>
+                        <li>If you didn't request this, ignore this email</li>
+                        <li>Only use this code on the official admin portal</li>
+                    </ul>
+                </div>
+                
+                <div style="text-align: center; margin: 25px 0;">
+                    <p style="color: #666; font-size: 14px;">
+                        This verification code was requested from the E&S Decorations admin system.
+                        <br>Time: {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC
+                    </p>
+                </div>
+                
+                <div style="border-top: 1px solid #ddd; padding-top: 20px; margin-top: 30px; text-align: center;">
+                    <p style="margin: 0; color: #667eea; font-weight: bold;">E&S Decorations Security Team</p>
+                    <p style="margin: 5px 0 0 0; font-size: 12px; color: #999;">
+                        This is an automated security message
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        plain_text = f"""
+        E&S Decorations - Admin Login Verification
+
+        Hello {admin_name},
+
+        Someone is attempting to access the E&S Decorations admin panel. If this is you, please use the verification code below to complete your login:
+
+        Verification Code: {code}
+
+        ⚠️ Security Notice:
+        • This code expires in 5 minutes
+        • Never share this code with anyone
+        • If you didn't request this, ignore this email
+        • Only use this code on the official admin portal
+
+        Time: {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC
+
+        E&S Decorations Security Team
+        This is an automated security message
+        """
+
+        params: resend.Emails.SendParams = {
+            "from": EMAIL_FROM,
+            "to": [email],
+            "subject": subject,
+            "html": html_content,
+            "text": plain_text,
+            "reply_to": "esdecorationsind@gmail.com"
+        }
+
+        email_response = resend.Emails.send(params)
+        print(f"✅ Admin verification email sent to {email}")
+        return True
+
+    except Exception as e:
+        print(f"❌ Error sending admin verification email: {str(e)}")
+        return False
+
+# Replace your existing admin login endpoints with these two new endpoints:
+
+@app.post("/admin-management-pambady-kayathumkal/request-verification")
+async def request_admin_verification(request: RequestVerificationCode):
+    """Step 1: Validate credentials and send verification code"""
+    try:
+        # First validate email and password
+        admin = await admins_collection.find_one({"email": request.email})
+        if not admin or not verify_password(request.password, admin["password"]):
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
-        access_token = create_access_token(data={"sub": admin["email"]})
-        return {"access_token": access_token, "token_type": "bearer"}
+        # Generate verification code
+        code = generate_verification_code()
+        expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=5)
+        
+        # Store verification code
+        verification_codes[request.email] = {
+            "code": code,
+            "expires": expires_at,
+            "admin_name": admin.get("name", "Admin")
+        }
+
+        # Send verification email
+        admin_name = admin.get("name", "Admin")
+        success = await send_admin_verification_email(request.email, code, admin_name)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to send verification email")
+        
+        print(f"✅ Verification code sent to {request.email}")
+        return {
+            "message": "Verification code sent to your email", 
+            "email": request.email,
+            "expires_in": "5 minutes"
+        }
+
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error during login: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"❌ Error requesting verification: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to process request")
+
+@app.post("/admin-management-pambady-kayathumkal/login", response_model=Token)
+async def admin_login_with_2fa(login_request: AdminLoginRequest):
+    """Step 2: Verify code and complete login"""
+    try:
+        # Check if verification code exists
+        if login_request.email not in verification_codes:
+            raise HTTPException(status_code=401, detail="No verification code requested. Please request a new code.")
+
+        stored_data = verification_codes[login_request.email]
+        
+        # Check if code expired
+        if datetime.datetime.utcnow() > stored_data["expires"]:
+            del verification_codes[login_request.email]
+            raise HTTPException(status_code=401, detail="Verification code expired. Please request a new code.")
+
+        # Check if code matches
+        if login_request.verification_code != stored_data["code"]:
+            raise HTTPException(status_code=401, detail="Invalid verification code")
+
+        # Verify admin credentials again (security)
+        admin = await admins_collection.find_one({"email": login_request.email})
+        if not admin or not verify_password(login_request.password, admin["password"]):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        # Clean up verification code
+        del verification_codes[login_request.email]
+
+        # Generate access token
+        access_token = create_access_token(data={"sub": admin["email"]})
+        
+        print(f"✅ Admin {admin.get('name')} successfully logged in with 2FA")
+        return {"access_token": access_token, "token_type": "bearer"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error during 2FA login: {str(e)}")
+        raise HTTPException(status_code=500, detail="Login failed")
+
+# Add a cleanup endpoint (optional - for removing expired codes)
+@app.post("/admin-management-pambady-kayathumkal/cleanup-codes")
+async def cleanup_expired_codes():
+    """Clean up expired verification codes"""
+    try:
+        now = datetime.datetime.utcnow()
+        expired_emails = []
+        
+        for email, data in verification_codes.items():
+            if now > data["expires"]:
+                expired_emails.append(email)
+        
+        for email in expired_emails:
+            del verification_codes[email]
+        
+        return {"message": f"Cleaned up {len(expired_emails)} expired codes"}
+    except Exception as e:
+        print(f"Error cleaning up codes: {str(e)}")
+        raise HTTPException(status_code=500, detail="Cleanup failed")
 
 # Add New Admin
-@app.post("/admin/add")
+@app.post("/admin-management-pambady-kayathumkal/add")
 async def add_admin(admin: AdminCreate):
     try:
         existing_admin = await admins_collection.find_one({"email": admin.email})
@@ -1161,7 +1320,7 @@ async def add_admin(admin: AdminCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 # Update Admin Details
-@app.patch("/admin/update/{admin_id}")
+@app.patch("/admin-management-pambady-kayathumkal/update/{admin_id}")
 async def update_admin(admin_id: str, admin_update: AdminUpdate):
     try:
         update_data = {}

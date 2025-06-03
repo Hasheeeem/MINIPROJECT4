@@ -1,130 +1,117 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Briefcase, Lock, Mail } from "lucide-react";
+import { Briefcase, Lock, Mail, Shield, ArrowLeft } from "lucide-react";
 import axios from "axios";
 
 const AdminLogin = () => {
   const navigate = useNavigate();
+  const [step, setStep] = useState(1); // 1 = credentials, 2 = verification code
   const [formData, setFormData] = useState({
     email: "",
     password: "",
+    verificationCode: "",
   });
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
 
-  // Auto-logout functionality
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    let isTabActive = true;
-
-    // Function to logout user
-    const logoutUser = () => {
-      localStorage.removeItem("adminToken");
-      sessionStorage.removeItem("adminSession");
-      navigate("/admin/login");
-      console.log("🔒 Auto-logout: Session expired");
-    };
-
-    // Handle tab visibility changes
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // Tab became inactive
-        isTabActive = false;
-        console.log("👁️ Tab became inactive");
-
-        // Set a timeout for auto-logout (5 seconds after tab switch)
-        timeoutId = setTimeout(() => {
-          if (!isTabActive) {
-            logoutUser();
-          }
-        }, 5000); // 5 seconds delay
-      } else {
-        // Tab became active again
-        isTabActive = true;
-        console.log("👁️ Tab became active");
-
-        // Clear the logout timeout if user returns quickly
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
-      }
-    };
-
-    // Handle window focus/blur events (alternative detection)
-    const handleFocus = () => {
-      isTabActive = true;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-
-    const handleBlur = () => {
-      isTabActive = false;
-      // Immediate logout on window blur (more aggressive)
-      timeoutId = setTimeout(() => {
-        if (!isTabActive) {
-          logoutUser();
-        }
-      }, 3000); // 3 seconds for window blur
-    };
-
-    // Add event listeners
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("focus", handleFocus);
-    window.addEventListener("blur", handleBlur);
-
-    // Cleanup function
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("focus", handleFocus);
-      window.removeEventListener("blur", handleBlur);
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [navigate]);
-
-  // Session management - check if user should be logged out
-  useEffect(() => {
-    const checkSession = () => {
-      const token = localStorage.getItem("adminToken");
-      const sessionId = sessionStorage.getItem("adminSession");
-
-      // If there's a token but no session ID, it means user opened a new tab
-      if (token && !sessionId) {
-        console.log("🚫 New tab detected - logging out");
-        localStorage.removeItem("adminToken");
-        navigate("/admin/login");
-      }
-    };
-
-    checkSession();
-  }, [navigate]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Step 1: Request verification code
+  const handleRequestCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
     try {
       const response = await axios.post(
-        "https://es-decorations.onrender.com/admin/login",
-        new URLSearchParams({
-          username: formData.email,
-          password: formData.password,
-        }),
+        "https://es-decorations.onrender.com/admin-management-pambady-kayathumkal/request-verification",
         {
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          email: formData.email,
+          password: formData.password,
+        },
+        {
+          headers: { "Content-Type": "application/json" },
         }
       );
 
-      // Store token and create session identifier
-      localStorage.setItem("adminToken", response.data.access_token);
-      sessionStorage.setItem("adminSession", Date.now().toString());
+      console.log("✅ Verification code requested successfully");
+      setCodeSent(true);
+      setStep(2);
+      setError("");
+    } catch (error: any) {
+      console.error("❌ Error requesting verification code:", error);
+      if (error.response?.status === 401) {
+        setError("Invalid email or password");
+      } else if (error.response?.status === 500) {
+        setError("Failed to send verification email. Please try again.");
+      } else {
+        setError("An error occurred. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      console.log("✅ Login successful");
-      navigate("/admin/dashboard");
+  // Step 2: Verify code and complete login
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await axios.post(
+        "https://es-decorations.onrender.com/admin-management-pambady-kayathumkal/login",
+        {
+          email: formData.email,
+          password: formData.password,
+          verification_code: formData.verificationCode,
+        },
+        {
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      // Store token and navigate to dashboard
+      localStorage.setItem("adminToken", response.data.access_token);
+      console.log("✅ 2FA Login successful");
+      navigate("/admin-management-pambady-kayathumkal/dashboard");
+    } catch (error: any) {
+      console.error("❌ Error verifying code:", error);
+      if (error.response?.status === 401) {
+        const message =
+          error.response.data?.detail || "Invalid verification code";
+        setError(message);
+      } else {
+        setError("Verification failed. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBackToStep1 = () => {
+    setStep(1);
+    setCodeSent(false);
+    setFormData({ ...formData, verificationCode: "" });
+    setError("");
+  };
+
+  const handleResendCode = async () => {
+    setLoading(true);
+    try {
+      await axios.post(
+        "https://es-decorations.onrender.com/admin-management-pambady-kayathumkal/request-verification",
+        {
+          email: formData.email,
+          password: formData.password,
+        }
+      );
+      setError("");
+      alert("Verification code resent to your email!");
     } catch (error) {
-      setError("Invalid credentials");
+      setError("Failed to resend code. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -140,89 +127,174 @@ const AdminLogin = () => {
             className="flex justify-center mb-6"
             whileHover={{ scale: 1.05 }}
           >
-            <Briefcase className="h-12 w-12 text-blue-500" />
+            {step === 1 ? (
+              <Briefcase className="h-12 w-12 text-blue-500" />
+            ) : (
+              <Shield className="h-12 w-12 text-green-500" />
+            )}
           </motion.div>
-          <h2 className="text-3xl font-bold text-white">Admin Login</h2>
+
+          <h2 className="text-3xl font-bold text-white">
+            {step === 1 ? "Admin Login" : "Verify Your Identity"}
+          </h2>
+
           <p className="mt-2 text-sm text-neutral-400">
-            Sign in to access the admin dashboard
+            {step === 1
+              ? "Enter your credentials to receive a verification code"
+              : "Enter the 6-digit code sent to your email"}
           </p>
 
           {/* Security Notice */}
-          <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-            <p className="text-xs text-yellow-400">
-              🔒 Enhanced Security: Session will auto-logout when switching tabs
+          <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+            <p className="text-xs text-blue-400">
+              🔒 Enhanced Security: 2-Factor Authentication enabled
             </p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-          {error && (
-            <div className="bg-red-500/10 text-red-500 p-3 rounded-lg text-sm text-center">
-              {error}
-            </div>
-          )}
+        {/* Step 1: Email & Password */}
+        {step === 1 && (
+          <form onSubmit={handleRequestCode} className="mt-8 space-y-6">
+            {error && (
+              <div className="bg-red-500/10 text-red-500 p-3 rounded-lg text-sm text-center">
+                {error}
+              </div>
+            )}
 
-          <div className="space-y-4">
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-neutral-300 mb-2"
-              >
-                Email
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-neutral-500" />
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-neutral-300 mb-2">
+                  Email
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-neutral-500" />
+                  </div>
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
+                    className="block w-full pl-10 pr-3 py-2 border border-neutral-700 rounded-lg bg-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="admin@example.com"
+                    disabled={loading}
+                  />
                 </div>
-                <input
-                  id="email"
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  className="block w-full pl-10 pr-3 py-2 border border-neutral-700 rounded-lg bg-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="admin@example.com"
-                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-neutral-300 mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-neutral-500" />
+                  </div>
+                  <input
+                    type="password"
+                    required
+                    value={formData.password}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
+                    className="block w-full pl-10 pr-3 py-2 border border-neutral-700 rounded-lg bg-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="••••••••"
+                    disabled={loading}
+                  />
+                </div>
               </div>
             </div>
 
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              type="submit"
+              disabled={loading}
+              className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-violet-600 text-white rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? "Sending Code..." : "Send Verification Code"}
+            </motion.button>
+          </form>
+        )}
+
+        {/* Step 2: Verification Code */}
+        {step === 2 && (
+          <form onSubmit={handleVerifyCode} className="mt-8 space-y-6">
+            {error && (
+              <div className="bg-red-500/10 text-red-500 p-3 rounded-lg text-sm text-center">
+                {error}
+              </div>
+            )}
+
+            {codeSent && (
+              <div className="bg-green-500/10 text-green-500 p-3 rounded-lg text-sm text-center">
+                ✅ Verification code sent to {formData.email}
+              </div>
+            )}
+
             <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-neutral-300 mb-2"
-              >
-                Password
+              <label className="block text-sm font-medium text-neutral-300 mb-2">
+                Verification Code
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-neutral-500" />
+                  <Shield className="h-5 w-5 text-neutral-500" />
                 </div>
                 <input
-                  id="password"
-                  type="password"
+                  type="text"
                   required
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  className="block w-full pl-10 pr-3 py-2 border border-neutral-700 rounded-lg bg-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="••••••••"
+                  maxLength={6}
+                  value={formData.verificationCode}
+                  onChange={(e) => {
+                    // Only allow numbers
+                    const value = e.target.value.replace(/\D/g, "");
+                    setFormData({ ...formData, verificationCode: value });
+                  }}
+                  className="block w-full pl-10 pr-3 py-2 border border-neutral-700 rounded-lg bg-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-center text-lg font-mono tracking-widest"
+                  placeholder="123456"
+                  disabled={loading}
                 />
               </div>
+              <p className="mt-1 text-xs text-neutral-500">
+                Code expires in 5 minutes
+              </p>
             </div>
-          </div>
 
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            type="submit"
-            className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-violet-600 text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
-          >
-            Sign In
-          </motion.button>
-        </form>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              type="submit"
+              disabled={loading || formData.verificationCode.length !== 6}
+              className="w-full px-4 py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? "Verifying..." : "Verify & Login"}
+            </motion.button>
+
+            {/* Action buttons */}
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={handleBackToStep1}
+                disabled={loading}
+                className="flex-1 px-4 py-2 bg-neutral-800 text-neutral-300 rounded-lg font-medium hover:bg-neutral-700 transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Back</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResendCode}
+                disabled={loading}
+                className="flex-1 px-4 py-2 bg-neutral-800 text-neutral-300 rounded-lg font-medium hover:bg-neutral-700 transition-colors disabled:opacity-50"
+              >
+                Resend Code
+              </button>
+            </div>
+          </form>
+        )}
       </motion.div>
     </div>
   );

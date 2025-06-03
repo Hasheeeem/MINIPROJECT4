@@ -6,7 +6,6 @@ import {
   Route,
   Navigate,
   useLocation,
-  useNavigate,
 } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import HeroSection from "./components/HeroSection";
@@ -23,196 +22,14 @@ import AdminDashboard from "./components/admin/AdminDashboard";
 import Preloader from "./components/Preloader";
 import ParticlesBackground from "./components/ParticlesBackground";
 
-// 🔒 IP GUARD COMPONENT - ADD THIS NEW COMPONENT
-const IPGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isAllowed, setIsAllowed] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [userIP, setUserIP] = useState("");
-
-  useEffect(() => {
-    checkIPWithBackend();
-  }, []);
-
-  const checkIPWithBackend = async () => {
-    try {
-      // Get user's IP address
-      const ipResponse = await fetch("https://api.ipify.org?format=json");
-      const ipData = await ipResponse.json();
-      const currentIP = ipData.ip;
-      setUserIP(currentIP);
-
-      console.log("🔍 Checking IP with backend:", currentIP);
-
-      // Call your backend to validate IP
-      const validationResponse = await fetch(
-        "https://es-decorations.onrender.com/api/validate-ip",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ ip: currentIP }),
-        }
-      );
-
-      if (!validationResponse.ok) {
-        throw new Error("IP validation failed");
-      }
-
-      const result = await validationResponse.json();
-      console.log("✅ Backend validation result:", result);
-
-      setIsAllowed(result.allowed);
-    } catch (error) {
-      console.error("❌ Error validating IP:", error);
-      setIsAllowed(false);
-    }
-    setLoading(false);
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-white">Verifying access permissions...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAllowed) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-900 to-black">
-        <div className="text-center max-w-md p-8">
-          <div className="text-red-500 text-8xl mb-6">🚫</div>
-          <h1 className="text-3xl font-bold text-red-400 mb-4">
-            Access Denied
-          </h1>
-          <p className="text-red-300 mb-4">
-            Your IP address{" "}
-            <span className="font-mono bg-red-900 px-2 py-1 rounded text-white">
-              {userIP}
-            </span>{" "}
-            is not authorized to access this admin section.
-          </p>
-          <p className="text-sm text-gray-400 mb-6">
-            Contact the administrator if you believe this is an error.
-          </p>
-          <div className="mt-6">
-            <button
-              onClick={() => (window.location.href = "/")}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors"
-            >
-              Go to Main Site
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return <>{children}</>;
-};
-
-// Admin Security Hook - Only for Tab Switching
-const useAdminSecurity = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  useEffect(() => {
-    console.log("🔍 Security Hook Running - Current Path:", location.pathname);
-
-    // Only apply security to admin routes (except login page)
-    if (
-      !location.pathname.startsWith("/admin") ||
-      location.pathname === "/admin/login"
-    ) {
-      console.log("⏭️ Skipping security - Not on protected admin page");
-      return;
-    }
-
-    console.log("🛡️ Admin Security Active for:", location.pathname);
-
-    let tabSwitchTimeout: NodeJS.Timeout;
-
-    const logoutUser = () => {
-      console.log("🚨 LOGOUT TRIGGERED - Tab was switched away for too long");
-      localStorage.removeItem("adminToken");
-      sessionStorage.removeItem("adminSession");
-      navigate("/admin/login");
-      alert("Session expired: You switched away from the admin tab!");
-    };
-
-    const handleVisibilityChange = () => {
-      console.log("📱 Visibility Event - Document hidden:", document.hidden);
-
-      if (document.hidden) {
-        console.log(
-          "👁️ USER SWITCHED AWAY from admin tab - Starting 5 second timer..."
-        );
-
-        tabSwitchTimeout = setTimeout(() => {
-          console.log("⏰ 5 seconds passed - User still away - LOGGING OUT");
-          logoutUser();
-        }, 5000);
-      } else {
-        console.log("👁️ USER RETURNED to admin tab - Canceling logout timer");
-
-        if (tabSwitchTimeout) {
-          clearTimeout(tabSwitchTimeout);
-          console.log("✅ Logout timer canceled - User returned in time");
-        }
-      }
-    };
-
-    // Check for new tab opening (immediate logout)
-    const checkNewTab = () => {
-      const token = localStorage.getItem("adminToken");
-      const sessionId = sessionStorage.getItem("adminSession");
-
-      console.log(
-        "🔑 New Tab Check - Token:",
-        !!token,
-        "Session:",
-        !!sessionId
-      );
-
-      if (token && !sessionId) {
-        console.log("🚫 NEW TAB DETECTED - Immediate logout");
-        localStorage.removeItem("adminToken");
-        navigate("/admin/login");
-        alert("New admin tab detected - Please use only one admin tab!");
-      }
-    };
-
-    // Run checks
-    checkNewTab();
-
-    // Only listen to tab visibility changes (not window focus/blur)
-    console.log("📡 Adding visibility change listener only...");
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    console.log(
-      "🧪 Security setup complete. Document hidden:",
-      document.hidden
-    );
-
-    // Cleanup
-    return () => {
-      console.log("🧹 Cleaning up visibility listener");
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      if (tabSwitchTimeout) {
-        clearTimeout(tabSwitchTimeout);
-      }
-    };
-  }, [navigate, location.pathname]);
-};
-
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = localStorage.getItem("adminToken");
-  return isAuthenticated ? <>{children}</> : <Navigate to="/admin/login" />;
+  return isAuthenticated ? (
+    <>{children}</>
+  ) : (
+    <Navigate to="/admin-management-pambady-kayathumkal/login" />
+  );
 };
 
 // Main page component with scroll handling
@@ -288,11 +105,8 @@ const PageTransitionWrapper = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-// App Content Component (where security hook is used)
+// App Content Component
 const AppContent = () => {
-  // Apply admin security globally
-  useAdminSecurity();
-
   const [initialLoading, setInitialLoading] = useState(true);
 
   useEffect(() => {
@@ -308,23 +122,17 @@ const AppContent = () => {
       <AnimatePresence>{initialLoading && <Preloader />}</AnimatePresence>
 
       <Routes>
-        {/* 🔒 ADMIN ROUTES - NOW PROTECTED WITH IP WHITELISTING */}
+        {/* 🔒 ADMIN ROUTES - New Secret URLs */}
         <Route
-          path="/admin/login"
-          element={
-            <IPGuard>
-              <AdminLogin />
-            </IPGuard>
-          }
+          path="/admin-management-pambady-kayathumkal/login"
+          element={<AdminLogin />}
         />
         <Route
-          path="/admin/*"
+          path="/admin-management-pambady-kayathumkal/*"
           element={
-            <IPGuard>
-              <ProtectedRoute>
-                <AdminDashboard />
-              </ProtectedRoute>
-            </IPGuard>
+            <ProtectedRoute>
+              <AdminDashboard />
+            </ProtectedRoute>
           }
         />
 

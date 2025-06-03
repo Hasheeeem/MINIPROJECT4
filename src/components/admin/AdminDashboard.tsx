@@ -19,7 +19,7 @@ import GalleryManagement from "./sections/GalleryManagement";
 import LatestWorksManagement from "./sections/LatestWorksManagement";
 import FAQManagement from "./sections/FAQManagement";
 import AdminHistory from "./sections/AdminHistory";
-import logo from '../../images/logo.png';
+import logo from "../../images/logo.png";
 
 const AdminLayout = () => {
   const navigate = useNavigate();
@@ -27,40 +27,40 @@ const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const menuItems = [
-    { 
-      icon: <Home className="h-5 w-5 flex-shrink-0" />, 
-      label: "Dashboard", 
-      href: "dashboard" 
+    {
+      icon: <Home className="h-5 w-5 flex-shrink-0" />,
+      label: "Dashboard",
+      href: "dashboard",
     },
-    { 
-      icon: <Settings className="h-5 w-5 flex-shrink-0" />, 
-      label: "Settings", 
-      href: "settings" 
+    {
+      icon: <Settings className="h-5 w-5 flex-shrink-0" />,
+      label: "Settings",
+      href: "settings",
     },
-    { 
-      icon: <Users className="h-5 w-5 flex-shrink-0" />, 
-      label: "Job Management", 
-      href: "jobs" 
+    {
+      icon: <Users className="h-5 w-5 flex-shrink-0" />,
+      label: "Job Management",
+      href: "jobs",
     },
-    { 
-      icon: <Mail className="h-5 w-5 flex-shrink-0" />, 
-      label: "User Inquiries", 
-      href: "inquiries" 
+    {
+      icon: <Mail className="h-5 w-5 flex-shrink-0" />,
+      label: "User Inquiries",
+      href: "inquiries",
     },
-    { 
-      icon: <Image className="h-5 w-5 flex-shrink-0" />, 
-      label: "Gallery Management", 
-      href: "gallery" 
+    {
+      icon: <Image className="h-5 w-5 flex-shrink-0" />,
+      label: "Gallery Management",
+      href: "gallery",
     },
-    { 
-      icon: <Image className="h-5 w-5 flex-shrink-0" />, 
-      label: "Latest Works", 
-      href: "latest-works" 
+    {
+      icon: <Image className="h-5 w-5 flex-shrink-0" />,
+      label: "Latest Works",
+      href: "latest-works",
     },
-    { 
-      icon: <MessageSquare className="h-5 w-5 flex-shrink-0" />, 
-      label: "FAQ Management", 
-      href: "faq" 
+    {
+      icon: <MessageSquare className="h-5 w-5 flex-shrink-0" />,
+      label: "FAQ Management",
+      href: "faq",
     },
   ];
 
@@ -70,9 +70,9 @@ const AdminLayout = () => {
   };
 
   const getCurrentPageTitle = () => {
-    const path = location.pathname.split('/').pop() || '';
-    const menuItem = menuItems.find(item => item.href === path);
-    return menuItem ? menuItem.label : 'Dashboard';
+    const path = location.pathname.split("/").pop() || "";
+    const menuItem = menuItems.find((item) => item.href === path);
+    return menuItem ? menuItem.label : "Dashboard";
   };
 
   return (
@@ -82,16 +82,16 @@ const AdminLayout = () => {
         <div className="flex items-center justify-center px-6 py-6 border-b border-neutral-800">
           <img src={logo} alt="E&S Logo" className="h-12 w-12 object-contain" />
         </div>
-        
+
         <div className="flex flex-col flex-1 p-4 space-y-2">
-          <a 
+          <a
             href="/"
             className="flex items-center gap-3 px-3 py-2 text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors"
           >
             <Home className="h-5 w-5 flex-shrink-0" />
             <span>View Site</span>
           </a>
-          
+
           {menuItems.map((item) => (
             <button
               key={item.href}
@@ -107,7 +107,7 @@ const AdminLayout = () => {
             </button>
           ))}
         </div>
-        
+
         <div className="p-4 border-t border-neutral-800">
           <button
             onClick={handleLogout}
@@ -122,10 +122,7 @@ const AdminLayout = () => {
       {/* Mobile Header */}
       <div className="lg:hidden flex items-center justify-between p-4 bg-neutral-900 border-b border-neutral-800">
         <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setSidebarOpen(true)}
-            className="text-white"
-          >
+          <button onClick={() => setSidebarOpen(true)} className="text-white">
             <Menu className="h-6 w-6" />
           </button>
           <img src={logo} alt="E&S Logo" className="h-8 w-8 object-contain" />
@@ -135,27 +132,31 @@ const AdminLayout = () => {
       {/* Mobile Sidebar */}
       {sidebarOpen && (
         <>
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 z-40 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
           <div className="fixed inset-y-0 left-0 w-64 bg-neutral-900 z-50 lg:hidden flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800">
-              <img src={logo} alt="E&S Logo" className="h-8 w-8 object-contain" />
+              <img
+                src={logo}
+                alt="E&S Logo"
+                className="h-8 w-8 object-contain"
+              />
               <button onClick={() => setSidebarOpen(false)}>
                 <X className="h-6 w-6 text-white" />
               </button>
             </div>
-            
+
             <div className="flex flex-col flex-1 p-4 space-y-2 overflow-y-auto">
-              <a 
+              <a
                 href="/"
                 className="flex items-center gap-3 px-3 py-2 text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors"
               >
                 <Home className="h-5 w-5 flex-shrink-0" />
                 <span>View Site</span>
               </a>
-              
+
               {menuItems.map((item) => (
                 <button
                   key={item.href}
@@ -174,7 +175,7 @@ const AdminLayout = () => {
                 </button>
               ))}
             </div>
-            
+
             <div className="p-4 border-t border-neutral-800">
               <button
                 onClick={handleLogout}
